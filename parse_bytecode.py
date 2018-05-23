@@ -112,6 +112,9 @@ class bytecode_parser:
                         info, idx = self.read_string(data, idx)
                     args.append(debug_type, info)
                 if args != []:
+                    for i, arg in enumerate(args):
+                        if type(arg) is int:
+                            args[i] = hex(arg)
                     if self.show_debug:
                         print(inst + ' ' + str(args))
                     result.append((inst, args))
@@ -177,9 +180,3 @@ class bytecode_parser:
         idx += 1
         return result, idx
 
-
-
-
-# data = b'#\x00\x00\x00\x00E\x05\x00\x00\x00-$\x00\x00\x00#arg count: sum in .testing.sumclass/\x14\x00A\x14\x01AB@\x08\x08'
-# bp = bytecode_parser()
-# bp.parse(data)
