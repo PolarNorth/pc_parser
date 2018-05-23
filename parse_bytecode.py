@@ -72,16 +72,16 @@ class bytecode_parser:
                     if inst.endswith('8bit'):
                         method_index, idx = self.read_int8(data, idx)
                         params_num, idx = self.read_int32(data, idx)
-                    if inst.endswith('32bit'):
+                    elif inst.endswith('32bit'):
                         method_index, idx = self.read_int32(data, idx)
                         params_num, idx = self.read_int32(data, idx)
                     else:
                         method_index = int(inst[len(inst)-2:])
-                        params_num, idx = self.read_int32(data, idx)
+                        params_num, idx = self.read_int8(data, idx)
                     if method_index < 0 or params_num < 0:
                         print(' ***WARNING: Wrong call!*** ') 
                         # f.write(' ***WARNING: Wrong call!*** \n')
-                    args.append((method_index, params_num))
+                    args = [method_index, params_num]
                 elif inst.endswith('_bin'):
                     arg_string, idx = self.read_string(data, idx)
                     args.append(arg_string)
