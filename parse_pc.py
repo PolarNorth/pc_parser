@@ -4,6 +4,7 @@ import binascii
 import parse_bytecode
 import pprint
 import sys
+import argparse
 
 class pc_parser:
     """.pc file parser
@@ -16,7 +17,7 @@ class pc_parser:
     show_rest_data = False
     show_method_code = False
     save_json = True
-    save_in_txt = True
+    save_in_txt = False
     show_debug = False
 
     def __init__(self, pc_dir, filename, output):
@@ -33,7 +34,7 @@ class pc_parser:
         self.pc_dir = dir
     
     def set_output_dir(self, dir):
-        self.output_dir = dir
+        self.output_dir = os.path.join(dir, '')
 
     def parse(self):
         result = {
@@ -322,13 +323,22 @@ class pc_parser:
         contained_class, idx = self.read_string(data, idx)
         return (is_container, main_class, contained_class), idx
 
+def main():
+    arg_parser = argparse.ArgumentParser(description='.pc files parser')
+    arg_parser.add_argument('-d', action='store_true', help='Show debug information')
+    arg_parser.add_argument('-t', action='store_true', help='Save information in .txt files')
+    arg_parser.add_argument('-m', action='store_true', help='Show method information')
+    arg_parser.add_argument('input_dir', metavar='I', type=str, help='Directory containing .pc files')
+    arg_parser.add_argument('filename', metavar='F', type=str, help='.pc file to parse')
+    arg_parser.add_argument('output_dir', metavar='O', type=str, help='Directory for program output')
+    args = sys.argv[1:]
+    parsed_args = arg_parser.parse_args(args)
+    parser = pc_parser(parsed_args.input_dir, parsed_args.filename, parsed_args.output_dir)
+    parser.show_debug = parsed_args.d
+    parser.show_method_code = parsed_args.m
+    parser.save_in_txt = parsed_args.t
+    parser.parse()
+    print('Done!')
 
-# p = pc_parser('plc_test/pc', 'testing.branching.pc', 'parsed/')
-# p.parse()
-
-if len(sys.argv)-1 is not 3:
-    print('***ERROR: wrong number of arguments! given ' + str(len(sys.argv)-1) + '. 3 required***')
-    print(sys.argv)
-
-p = pc_parser(sys.argv[1], sys.argv[2], sys.argv[3])
-p.parse()
+if __name__ == '__main__':
+    main()
