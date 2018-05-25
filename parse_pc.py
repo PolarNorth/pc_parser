@@ -75,19 +75,22 @@ class pc_parser:
                         result['class_description']['info'] = info
                     elif (rec_type == ord('M')):
                         info, rest = self.method_handler(rec_data)
-                        if info['name'] in result['methods'].keys():
-                            result['methods'][info['name']].update(info)
+                        if info['ordinal'] in result['methods'].keys():
+                            result['methods'][info['ordinal']].update(info)
                         else:
-                            result['methods'][info['name']] = info
+                            result['methods'][info['ordinal']] = info
                     elif (rec_type == ord('S')):
                         info, rest = self.method_signature_handler(rec_data)
-                        if info['name'] in result['methods'].keys():
-                            result['methods'][info['name']].update(info)
+                        if info['ordinal'] in result['methods'].keys():
+                            result['methods'][info['ordinal']].update(info)
                         else:
-                            result['methods'][info['name']] = info
+                            result['methods'][info['ordinal']] = info
                     elif (rec_type == ord('l')):
                         info, rest = self.ip2lnm_handler(rec_data)
-                        result['class_description']['IP_to_ln'] = info
+                        if info['ordinal'] in result['methods'].keys():
+                            result['methods'][info['ordinal']].update(info)
+                        else:
+                            result['methods'][info['ordinal']] = info
                     elif (rec_type == ord('f')):
                         info, rest = self.field_handler(rec_data)
                         result['class_description']['fields'][info['name']] = info
@@ -221,18 +224,21 @@ class pc_parser:
         """Reads a list of IP addresses and line numbers from the data
         """
         idx_loc = 0
+        ordinal, idx_loc = self.read_int32(data, idx_loc)
+        count, idx_loc = self.read_int32(data, idx_loc)
         ip_ln = []
-        rest_len = 0
-        if len(data) % 8 is not 0:
-            rest_len = 10
-        while (idx_loc + 8 <= len(data)-rest_len):   #While we can read 2 int32
-            ip, idx_loc = self.read_int32(data, idx_loc)
+        for entry in range(0,count):
+            ip, idx_loc = self.read_int64(data, idx_loc)
             line_number, idx_loc = self.read_int32(data, idx_loc)
             ip_ln.append((ip, line_number))
-            if self.show_debug:
-                print("ip - ln: " + str(ip) + ' - ' + str(line_number))
-        rest = data[len(data)-rest_len:]
-        return ip_ln, rest
+        rest = data[idx_loc:]
+        if self.show_debug:
+            print('= IP addresses to line numbers')
+            print('Ordinal: ' + str(ordinal))
+            print('Entries number: ' + str(count))
+            for ip, ln in ip_ln:
+                print(' - ' + hex(ip) + ' -> ' + hex(ln))
+        return {'ordinal' : ordinal, 'ip_to_ln' : ip_ln}, rest
 
     def store_in_json(self, **data):
         """Saves data into .json file
@@ -250,20 +256,28 @@ class pc_parser:
         with open(self.output_dir + cls_file, 'w') as f:
             for k,v in data['class_description']['info'].items():
                 f.write(str(k) + ': ' + str(v) + '\n')
-            f.write('IP addresses to line numbers:\n')
-            if data['class_description']['IP_to_ln'] is not None:
-                for pair in data['class_description']['IP_to_ln']:
-                    f.write(hex(pair[0]) + ' -> ' + hex(pair[1]) + '\n')
+            f.write('Fields :\n')
+            for name,info in data['class_description']['fields'].items():
+                f.write('Field name: ' + name + '\n')
+                f.write('  Ordinal: ' + str(info['ordinal']) + '\n')
+                f.write('  Type:\n')
+                f.write('  - is container: ' + str(info['type'][0]) + '\n')
+                f.write('  - class name: ' + str(info['type'][1]) + '\n')
+                f.write('  - contained class: ' + str(info['type'][2]) + '\n')
 
-        for k,v in data['methods'].items():
-            mth_file = 'mth_' + data['class_description']['info']['name'] + '.' + k + '.txt'
+        for ordinal,info in data['methods'].items():
+            mth_file = 'mth_' + data['class_description']['info']['name'] + '.' + info['name'] + '.txt'
             code = None
+            ip_to_ln = None
             with open(self.output_dir + mth_file, 'w') as f:
-                for pair in v.items():
-                    if (pair[0] is 'code'):
-                        code = pair[1]
+                for key,value in info.items():
+                    if (key is 'code'):
+                        code = value
                         continue
-                    f.write(pair[0] + ': ' + str(pair[1]) + '\n')          
+                    elif (key is 'ip_to_ln'):
+                        ip_to_ln = value
+                        continue
+                    f.write(key + ': ' + str(value) + '\n')          
                 if (code is not None):
                     f.write('code:\n\n')
                     for inst in code:
@@ -276,6 +290,10 @@ class pc_parser:
                             f.write('\n')
                         else:
                             f.write(inst + '\n')
+                    if (ip_to_ln is not None):
+                        f.write('\nIP addresses to line numbers\n')
+                        for entry in ip_to_ln:
+                            f.write(hex(entry[0]) + ' -> (dec)' + str(entry[1]) + '\n')
                 else:
                     f.write('***ERROR : No code for this method!***')
 
@@ -306,6 +324,13 @@ class pc_parser:
         """
         result = self.bytes_to_int(data[idx:idx+4])
         idx += 4
+        return result, idx
+
+    def read_int64(self, data, idx):
+        """Reads 64-bit integer
+        """
+        result = self.bytes_to_int(data[idx:idx+8])
+        idx += 8
         return result, idx
 
     def read_int8(self, data, idx):
