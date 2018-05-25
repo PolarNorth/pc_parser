@@ -46,7 +46,8 @@ class bytecode_parser:
         # f.write(s)
 
         opcodes = {}
-        with open('opcodes.json', 'r') as js:
+        cur_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(cur_dir, 'opcodes.json'), 'r') as js:
             opcodes = json.load(js)
 
         # f.write('\n\n\n')
@@ -57,6 +58,7 @@ class bytecode_parser:
             x = data[idx]
             key = str(x)
             if key in opcodes.keys():
+                ip = idx
                 inst = opcodes[key]
                 idx += 1
                 # print(inst)
@@ -112,17 +114,20 @@ class bytecode_parser:
                         info, idx = self.read_string(data, idx)
                     args.append(debug_type, info)
                 if args != []:
-                    for i, arg in enumerate(args):
-                        if type(arg) is int:
-                            args[i] = hex(arg)
+                    if inst == 'opcode_jmp' or inst == 'opcode_jz' or inst == 'opcode_djnz':
+                        args[0] = hex(args[0]) + ' (jump to ' + hex(ip + 1 + args[0]) + ')'
+                    else:
+                        for i, arg in enumerate(args):
+                            if type(arg) is int:
+                                args[i] = hex(arg)
                     if self.show_debug:
                         print(inst + ' ' + str(args))
-                    result.append((inst, args))
+                    result.append((hex(ip) + ' ' + inst, args))
                     # f.write(str(args))
                 else:
                     if self.show_debug:
                         print(inst)
-                    result.append((inst, []))
+                    result.append((hex(ip) + ' ' + inst, []))
                 # f.write('\n')
             else:
                 unexpected += str(x) + ' '
