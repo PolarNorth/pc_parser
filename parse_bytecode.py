@@ -115,7 +115,8 @@ class bytecode_parser:
                     args.append(debug_type, info)
                 if args != []:
                     if inst == 'opcode_jmp' or inst == 'opcode_jz' or inst == 'opcode_djnz':
-                        args[0] = hex(args[0]) + ' (jump to ' + hex(ip + 1 + args[0]) + ')'
+                        args.append('(jump to ' + hex((ip + 1 + args[0]) % int('0x100000000', 16)) + ')')
+                        args[0] = hex(args[0])
                     else:
                         for i, arg in enumerate(args):
                             if type(arg) is int:
