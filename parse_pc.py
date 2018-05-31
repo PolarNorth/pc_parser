@@ -41,7 +41,7 @@ class pc_parser:
             'class_description' : {
                 'info' : None,
                 'fields' : {},
-                'IP_to_ln' : None
+                'constants' : {}
             },
             'methods' : {}
         }
@@ -94,8 +94,12 @@ class pc_parser:
                     elif (rec_type == ord('f')):
                         info, rest = self.field_handler(rec_data)
                         result['class_description']['fields'][info['name']] = info
+                    elif (rec_type == ord('c')):
+                        info, rest = self.constant_handler(rec_data)
+                        result['class_description']['constants'][info['constant id']] = info
                     else:
                         print(' ***ERROR: Unknown signature: ' + chr(rec_type) + '(' + str(rec_type) + ')***')
+                        print(str(rec_data))
                     
                     if self.show_rest_data:
                         print('Rest data: ' + str(rest))
@@ -113,6 +117,26 @@ class pc_parser:
                 self.store_in_txt(**result)
             
     
+    def constant_handler(self, data):
+        """Reads an information about constant
+        """
+        idx_loc = 0;
+        const_id, idx_loc = self.read_int32(data, idx_loc)
+        const_type, idx_loc = self.read_phantom_type(data, idx_loc)
+        value = data[idx_loc:]
+        rest = None
+        if data[len(data)-10:len(data)-5] == b'phfr:':  # TODO : replace with more reliable solution
+            value = data[idx_loc:len(data)-10]
+            rest = data[len(data)-10:]
+        if self.show_debug:
+            print('= Constant:')
+            print('Constant ID (Ordinal): ' + str(const_id))
+            print(' - is container: ' + str(const_type[0]))
+            print(' - class name: ' + str(const_type[1]))
+            print(' - contained class: ' + str(const_type[2]))
+            print('Value : ' + str(value))
+        return {'constant id' : const_id, 'constant type' : const_type, 'value' : str(value)}, rest
+
     def field_handler(self, data):
         """Reads an information about field from the data
         """
@@ -264,6 +288,14 @@ class pc_parser:
                 f.write('  - is container: ' + str(info['type'][0]) + '\n')
                 f.write('  - class name: ' + str(info['type'][1]) + '\n')
                 f.write('  - contained class: ' + str(info['type'][2]) + '\n')
+            f.write('Constants : (Some of the constants could be overwritten)\n')
+            for ordinal, info in data['class_description']['constants'].items():
+                f.write('Constant #' + str(ordinal) + '\n')
+                f.write('  - is container: ' + str(info['constant type'][0]) + '\n')
+                f.write('  - class name: ' + str(info['constant type'][1]) + '\n')
+                f.write('  - contained class: ' + str(info['constant type'][2]) + '\n')
+                f.write('  - value : ' + str(info['value']) + '\n')
+
 
         for ordinal,info in data['methods'].items():
             mth_file = 'mth_' + data['class_description']['info']['name'] + '.' + info['name'] + '.txt'
@@ -281,6 +313,9 @@ class pc_parser:
                 if (code is not None):
                     f.write('code:\n\n')
                     for inst in code:
+                        if inst[0].split(' ')[1] == 'const_pool':
+                            inst[1].append('(value: ' + \
+                            str( data['class_description']['constants'][int(inst[1][0],16)]['value'] ) + ')')
                         if len(inst) is 2:
                             opcode = inst[0]
                             args = inst[1]
@@ -353,12 +388,13 @@ def main():
     arg_parser.add_argument('-d', action='store_true', help='Show debug information')
     arg_parser.add_argument('-t', action='store_true', help='Save information in .txt files')
     arg_parser.add_argument('-m', action='store_true', help='Show method information')
-    arg_parser.add_argument('input_dir', metavar='I', type=str, help='Directory containing .pc files')
+    # arg_parser.add_argument('input_dir', metavar='I', type=str, help='Directory containing .pc files')
     arg_parser.add_argument('filename', metavar='F', type=str, help='.pc file to parse')
     arg_parser.add_argument('output_dir', metavar='O', type=str, help='Directory for program output')
     args = sys.argv[1:]
     parsed_args = arg_parser.parse_args(args)
-    parser = pc_parser(parsed_args.input_dir, parsed_args.filename, parsed_args.output_dir)
+    # parser = pc_parser(parsed_args.input_dir, parsed_args.filename, parsed_args.output_dir)
+    parser = pc_parser('', parsed_args.filename, parsed_args.output_dir)
     parser.show_debug = parsed_args.d
     parser.show_method_code = parsed_args.m
     parser.save_in_txt = parsed_args.t
