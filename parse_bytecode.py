@@ -6,6 +6,7 @@ class bytecode_parser:
     """
 
     show_debug = False
+    opcodes_file = 'opcodes_jit.json'   #opcodes_master for plc in master
 
     def __init__(self):
         """Constructor
@@ -47,7 +48,7 @@ class bytecode_parser:
 
         opcodes = {}
         cur_dir = os.path.dirname(os.path.abspath(__file__))
-        with open(os.path.join(cur_dir, 'opcodes.json'), 'r') as js:
+        with open(os.path.join(cur_dir, self.opcodes_file), 'r') as js:
             opcodes = json.load(js)
 
         # f.write('\n\n\n')
@@ -78,7 +79,7 @@ class bytecode_parser:
                         method_index, idx = self.read_int32(data, idx)
                         params_num, idx = self.read_int32(data, idx)
                     else:
-                        method_index = int(inst[len(inst)-2:])
+                        method_index = int(inst[len(inst)-2:], 16)
                         params_num, idx = self.read_int8(data, idx)
                     if method_index < 0 or params_num < 0:
                         print(' ***WARNING: Wrong call!*** ') 
@@ -112,9 +113,9 @@ class bytecode_parser:
                     info = ''
                     if bin(debug_type)[2] == '1':   #if we have string after type
                         info, idx = self.read_string(data, idx)
-                    args.append(debug_type, info)
+                    args.append((debug_type, info))
                 if args != []:
-                    if inst == 'opcode_jmp' or inst == 'opcode_jz' or inst == 'opcode_djnz':
+                    if inst == 'opcode_jmp' or inst == 'opcode_jz' or inst == 'opcode_djnz' or inst == 'opcode_push_catcher':
                         args.append('(jump to ' + hex((ip + 1 + args[0]) % int('0x100000000', 16)) + ')')
                         args[0] = hex(args[0])
                     else:
@@ -123,21 +124,31 @@ class bytecode_parser:
                                 args[i] = hex(arg)
                     if self.show_debug:
                         print(inst + ' ' + str(args))
-                    result.append((hex(ip) + ' ' + inst, args))
+                    result.append((hex(ip) + ' ' + inst[7:], args))
                     # f.write(str(args))
                 else:
                     if self.show_debug:
                         print(inst)
-                    result.append((hex(ip) + ' ' + inst, []))
+                    result.append((hex(ip) + ' ' + inst[7:], []))
                 # f.write('\n')
             else:
+                if x == 41: # TODO : Find instruction for this opcode!!!
+                    ip = idx
+                    idx += 1
+                    nulls_num = data[idx]
+                    idx += 1
+                    ints_num = data[idx]
+                    idx += 1
+                    args = [nulls_num, ints_num]
+                    result.append((hex(ip) + ' UNKNOWN OPCODE 0x29!!! Summon (null objects, integers) ',  args))
+                    continue
                 unexpected += str(x) + ' '
                 idx += 1
                 print(' ***WARNING: Unexpected byte to read!***')
                 result.append((' ***WARNING: Unexpected byte to read!***'))
                 # f.write(' ***WARNING: Unexpected byte to read!*** \n')
         if (len(unexpected) > 0):
-            result.append(('UNEXPECTED', unexpected))
+            result.append(('UNEXPECTED', [unexpected]))
             print ('***UNEXPECTED: ' + unexpected + '***')
             # f.write('\n***UNEXPECTED: ' + unexpected + '***')
         if self.show_debug:
